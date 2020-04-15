@@ -4,7 +4,10 @@ const express = require("express")
 const bodyParser = require("body-parser")
 const ejs = require("ejs")
 const mongoose = require("mongoose")
-const md5 = require("md5");
+const bcrypt = require("bcrypt")
+const saltRounds = 10;
+
+
 app = express();
 app.set("view engine", "ejs");
 app.use(bodyParser.urlencoded({extended:true}));
@@ -36,18 +39,23 @@ app.get("/register", function(req, res){
 
 app.post("/register", function(req, res){
     const newEmail = req.body.username;
-    const newPassword = md5(req.body.password);
-    const newUser = new User({
-        email: newEmail,
-        password: newPassword
+    const newPassword = req.body.password
+    bcrypt.hash(newPassword, saltRounds, function(err, hash) {
+        // Store hash in your password DB.
+        const newUser = new User({
+            email: newEmail,
+            password: hash
+        })
+        newUser.save(function(err){
+            if (err){
+                res.send(err)
+            }else{
+                res.render("secrets")
+            }
+        });
+
     })
-    newUser.save(function(err){
-        if (err){
-            res.send(err)
-        }else{
-            res.render("secrets")
-        }
-    });
+    
 });
 
 app.post("/login", function(req, res){
@@ -55,14 +63,18 @@ app.post("/login", function(req, res){
     const userPassword = req.body.password;
     User.findOne({email: userEmail}, function(err, foundUser){
         if (!err){
-            if (foundUser.password === userPassword){
-                res.render("secrets")
-            }else{
-                res.send("Incorrect password")
-            }
-        }else{
-            console.log(err)
+            // Load hash from your password DB.
+            bcrypt.compare(userPassword, foundUser.password, function(err, result) {
+                if (result == true){
+                    res.render("secrets")
+                }else{
+                    res.send("Incorrect password")
+                }
+            });
         }
+
+
+            
     })  
 })
 
